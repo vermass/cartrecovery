@@ -26,7 +26,7 @@ public class PushNotificationConsumer {
 
     public void consume(String message) {
         logger.info(
-                "Received push notification event: {}",
+                "[PushNotificationConsumer] Received push notification event: {}",
                 message
         );
         ObjectMapper objectMapper = new ObjectMapper();

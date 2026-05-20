@@ -27,7 +27,7 @@ public class EmailNotificationConsumer {
 
     public void consume(String message) {
         logger.info(
-                "Received email notification event: {}",
+                "[EmailNotificationConsumer] Received email notification event: {}",
                 message
         );
         ObjectMapper objectMapper = new ObjectMapper();

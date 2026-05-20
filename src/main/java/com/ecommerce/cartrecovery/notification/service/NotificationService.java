@@ -5,11 +5,9 @@ import com.ecommerce.cartrecovery.entity.CartRecoveryNotificationConfigEntity;
 import com.ecommerce.cartrecovery.entity.CartRecoveryNotificationLogEntity;
 import com.ecommerce.cartrecovery.entity.CartRecoveryNotificationScheduleEntity;
 import com.ecommerce.cartrecovery.enums.NotificationType;
-import com.ecommerce.cartrecovery.notification.kafka.producer.NotificationEventProducer;
 import com.ecommerce.cartrecovery.repository.CartRecoveryNotificationLogRepository;
 import com.ecommerce.cartrecovery.service.CampaignService;
 import com.ecommerce.cartrecovery.service.CartRecoveryService;
-import org.apache.kafka.common.protocol.types.Field;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,9 +20,6 @@ import java.util.List;
 public class NotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationService.class);
-
-    @Autowired
-    private NotificationEventProducer notificationEventProducer;
 
     @Autowired
     private CartRecoveryService cartRecoveryService;
@@ -52,7 +47,7 @@ public class NotificationService {
         }
 
         String renderedTemplate = fillTemplate(campaignEntity.getTemplate(), entity.getUserId(), entity.getCartId());
-        logger.info("[Email] sent : {} ", renderedTemplate);
+        logger.info("[EmailNotification] sent for cart {} and user {} with template : {} ",entity.getCartId(), entity.getUserId(), renderedTemplate);
         saveNotificationLog(entity, configEntity, renderedTemplate);
     }
 
@@ -74,7 +69,7 @@ public class NotificationService {
         }
         String renderedTemplate = fillTemplate(campaignEntity.getTemplate(), entity.getUserId(), entity.getCartId());
 
-        logger.info("[Push] sent : {} ", renderedTemplate);
+        logger.info("[PushNotification] sent for cart {} and user {} with template : {} ",entity.getCartId(), entity.getUserId(), renderedTemplate);
         saveNotificationLog(entity, configEntity, renderedTemplate);
 
     }
@@ -98,7 +93,7 @@ public class NotificationService {
         }
         String renderedTemplate = fillTemplate(campaignEntity.getTemplate(), entity.getUserId(), entity.getCartId());
 
-        logger.info("[SMS] sent : {} ", renderedTemplate);
+        logger.info("[SMSNotification] sent for cart {} and user {} with template : {} ",entity.getCartId(), entity.getUserId(), renderedTemplate);
         saveNotificationLog(entity, configEntity, renderedTemplate);
     }
 

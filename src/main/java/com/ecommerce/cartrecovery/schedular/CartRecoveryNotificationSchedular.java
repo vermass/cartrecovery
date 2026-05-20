@@ -1,6 +1,9 @@
 package com.ecommerce.cartrecovery.schedular;
 
+import com.ecommerce.cartrecovery.kafka.consumer.CartActivityConsumer;
 import com.ecommerce.cartrecovery.service.CartRecoveryService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -9,12 +12,13 @@ import org.springframework.stereotype.Service;
 public class CartRecoveryNotificationSchedular {
     @Autowired
     private CartRecoveryService cartRecoveryService;
+    private static final Logger logger = LoggerFactory.getLogger(CartRecoveryNotificationSchedular.class);
 
-    @Scheduled(cron = "0 */1 * * * *")
+
+    @Scheduled(cron = "*/30 * * * * *")
     public void processAbandonedCarts() {
 
-        System.out.println("[Abandoned cart notification schedular] Running abandoned cart scheduler");
-
+        logger.info("[CartRecoveryNotificationSchedular] starting cart recovery notification job" );
         cartRecoveryService.processPendingNotificationSchedule();
     }
 }

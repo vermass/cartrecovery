@@ -5,7 +5,8 @@ import com.ecommerce.cartrecovery.entity.Cart;
 import com.ecommerce.cartrecovery.entity.CartItem;
 import com.ecommerce.cartrecovery.enums.CartActivityType;
 import com.ecommerce.cartrecovery.enums.CartStatusEnum;
-import com.ecommerce.cartrecovery.exceptions.InvalidCartException;
+import com.ecommerce.cartrecovery.exceptions.CartNotFoundException;
+import com.ecommerce.cartrecovery.exceptions.ItemNotFoundException;
 import com.ecommerce.cartrecovery.kafka.producer.CartUpdateEventProducer;
 import com.ecommerce.cartrecovery.repository.CartItemRepository;
 import com.ecommerce.cartrecovery.repository.CartRepository;
@@ -45,7 +46,7 @@ public class CartService {
     public boolean addItem(AddItemRequest request, BigInteger cartId) {
         Cart cart = cartRepository.findByCartIdAndStatus(cartId, CartStatusEnum.CREATED)
                 .orElseThrow(() ->
-                        new InvalidCartException("Invalid cart"));
+                        new CartNotFoundException("Cart with id " + cartId + " not found"));
 
         CartItem cartItem = new CartItem();
         cartItem.setItemId(request.getItemId())
@@ -58,9 +59,7 @@ public class CartService {
 
     public void checkoutCart(BigInteger cartId) {
         Cart cart = cartRepository.findById(cartId)
-                .orElseThrow(() ->
-                        new RuntimeException("Cart not found")
-                );
+                .orElseThrow(() -> new CartNotFoundException("Cart with id " + cartId + " not found"));
 
         cart.setStatus(CartStatusEnum.CHECKED_OUT);
         cartRepository.save(cart);
@@ -81,24 +80,27 @@ public class CartService {
 
     public void deleteCart(BigInteger cartId) {
         Cart cart = cartRepository.findById(cartId)
-                .orElseThrow(() ->
-                        new RuntimeException("Cart not found")
-                );
+                .orElseThrow(() -> new CartNotFoundException("Cart with id " + cartId + " not found"));
         cartRepository.delete(cart);
+        publishCartActivityEvent(cart.getCartId(), CartActivityType.DELETED, LocalDateTime.now());
     }
 
     public void removeItem(BigInteger cartId, BigInteger itemId) {
         Cart cart = cartRepository.findByCartIdAndStatus(cartId, CartStatusEnum.CREATED)
                 .orElseThrow(() ->
-                        new InvalidCartException("Invalid cart"));
+                        new CartNotFoundException("Cart with id " + cartId + " not found"));
 
         CartItem item = cartItemRepository
                 .findByCart_CartIdAndItemId(cartId, itemId)
-                .orElseThrow(() ->
-                        new RuntimeException("Item not found in cart")
-                );
+                .orElseThrow(() -> new ItemNotFoundException("Item with id " + itemId + " not found in cart"));
         cartItemRepository.delete(item);
-        publishCartActivityEvent(cart.getCartId(), CartActivityType.MODIFY, LocalDateTime.now());
+
+        // delete cart in case of no items
+        if (cart.getItems().isEmpty()) {
+            deleteCart(cart.getCartId());
+        } else {
+            publishCartActivityEvent(cart.getCartId(), CartActivityType.MODIFY, LocalDateTime.now());
+        }
     }
 
     private void publishCartActivityEvent(BigInteger cartId, CartActivityType activityType, LocalDateTime timestamp) {

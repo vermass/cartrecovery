@@ -54,7 +54,10 @@ public class CartRecoveryService {
     private CartActivityLogRepository cartActivityLogRepository;
 
     private static final String CART_UPDATE_EVENTS_SET = "cart_update_events_set";
+
+    // time after which cart will be marked as abandoned
     private static final Integer Abandoned_cart_inactive_duration_in_minute = 1;
+
 
     public void processCartUpdateEvent(CartActivityEvent cartActivityEvent) {
         CartActivityLogEntity entity =
@@ -66,8 +69,8 @@ public class CartRecoveryService {
 
         cartActivityLogRepository.save(entity);
 
-        if (cartActivityEvent.getActivityType().equals(CartActivityType.CHECKOUT)) {
-            logger.info("[CartRecoveryService] cart status is checked out {} ", cartActivityEvent);
+        if (cartActivityEvent.getActivityType().equals(CartActivityType.CHECKOUT) || cartActivityEvent.getActivityType().equals(CartActivityType.DELETED)) {
+            logger.info("[CartRecoveryService] cart status is checked-out or deleted {} ", cartActivityEvent);
             return;
         }
 
@@ -103,7 +106,6 @@ public class CartRecoveryService {
             cartToUpdatedTimestampMap.put(cartId, scheduledTime);
         }
 
-
         if (!cartToUpdatedTimestampMap.isEmpty()) {
             redisRepository.delete(CART_UPDATE_EVENTS_SET, cartToUpdatedTimestampMap.keySet());
         }
@@ -113,7 +115,7 @@ public class CartRecoveryService {
             createCartRecoveryNotificationSchedule(new BigInteger(cartId), cartToUpdatedTimestampMap.get(cartId), 1);
         }
 
-        logger.info("[abandoned cart ids] {}", cartToUpdatedTimestampMap.keySet());
+        logger.info("[abandoned cart ids found for notification] {}", cartToUpdatedTimestampMap.keySet());
 
     }
 
@@ -130,7 +132,7 @@ public class CartRecoveryService {
             return;
         }
         if (!cart.isPending()) {
-            logger.error("[CartRecoveryService] cart already checked_out or expired {} ", cartId);
+            logger.error("[CartRecoveryService] cart already checked_out or expired or deleted {} ", cartId);
             return;
         }
 
@@ -146,11 +148,12 @@ public class CartRecoveryService {
                 .currentStage(config.getStage())
                 .build();
         cartRecoveryNotificationScheduleRepository.save(schedule);
+        logger.info("[CartRecoveryService] abandoned cart notification scheduled for cart cartId {} and stage {} ", cartId, stage);
     }
 
     public void processPendingNotificationSchedule() {
 
-        LocalDateTime startTime = LocalDateTime.now().minusMinutes(50);
+        LocalDateTime startTime = LocalDateTime.now().minusMinutes(30);
         LocalDateTime endTime = LocalDateTime.now();
 
         List<CartRecoveryNotificationScheduleEntity> schedules =
@@ -161,6 +164,7 @@ public class CartRecoveryService {
         );
 
         logger.info("[processPendingNotificationSchedule] total record for notification {}", schedules.size());
+
         for (CartRecoveryNotificationScheduleEntity schedule : schedules) {
             logger.info("Processing notification for entity : {}", schedule);
             // verify cart status
@@ -173,15 +177,16 @@ public class CartRecoveryService {
             }
 
             CartActivityLogEntity entity = cartActivityLogRepository.findTopByCartIdOrderByActivityTimestampDesc(cart.getCartId()).orElse(null);
-            if (entity.getActivityTimestamp().isAfter(schedule.getLastActivityTimestamp())) {
+            if (entity != null && entity.getActivityTimestamp().isAfter(schedule.getLastActivityTimestamp())) {
                 schedule.setStatus(ScheduleStatus.CANCELLED);
                 cartRecoveryNotificationScheduleRepository.save(schedule);
-                logger.info("some activity has happened on cart skipping: {}", schedule.getCartId());
+                logger.info("some activity has happened on cart {} skipping notification: ", schedule.getCartId());
                 continue;
             }
 
             notificationEventProducer.publishNotificationEvent(schedule);
 
+            logger.info("[CartRecoveryService] sending notification for cartId => {}", entity.getCartId());
             // update schedule status
             schedule.setStatus(ScheduleStatus.COMPLETED);
             cartRecoveryNotificationScheduleRepository.save(schedule);

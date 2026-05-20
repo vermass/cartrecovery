@@ -25,7 +25,7 @@ public class SmsNotificationConsumer {
 
     public void consume(String message) {
         logger.info(
-                "Received sms notification event: {}",
+                "[SMSNotificationConsumer] Received sms notification event: {}",
                 message
         );
         ObjectMapper objectMapper = new ObjectMapper();
